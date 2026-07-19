@@ -5,6 +5,7 @@ import { prisma } from "./db.js";
 import { runCode } from "./runner.js";
 import { summarizeSession } from "./session-summary.js";
 import { classifyTutorResponse, streamTutorResponse, type TutorTurn } from "./tutor.js";
+import { assessSession } from "./assessor.js";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -26,6 +27,53 @@ app.post("/api/sessions", async (request, response, next) => {
     if (!assignment) return response.status(404).json({ error: "Assignment not found." });
     const session = await prisma.session.create({ data: { studentName: studentName.trim(), assignmentId, startedAt: new Date(), events: { create: { type: "SESSION_START", timestamp: new Date(), payloadJson: "{}" } } } });
     return response.status(201).json(session);
+  } catch (error) { return next(error); }
+});
+
+app.get("/api/sessions", async (_request, response, next) => {
+  try {
+    const sessions = await prisma.session.findMany({
+      orderBy: { startedAt: "desc" },
+      include: { assignment: { select: { title: true } }, assessment: { select: { authorshipScore: true, engagementScore: true } } }
+    });
+    return response.json(sessions.map((session) => ({
+      id: session.id,
+      studentName: session.studentName,
+      assignmentTitle: session.assignment.title,
+      startedAt: session.startedAt,
+      submittedAt: session.submittedAt,
+      status: session.status,
+      authorshipScore: session.assessment?.authorshipScore ?? null,
+      engagementScore: session.assessment?.engagementScore ?? null
+    })));
+  } catch (error) { return next(error); }
+});
+
+app.get("/api/sessions/:id", async (request, response, next) => {
+  try {
+    const session = await prisma.session.findUnique({
+      where: { id: request.params.id },
+      include: { assignment: true, events: { orderBy: { timestamp: "asc" } }, assessment: true }
+    });
+    if (!session) return response.status(404).json({ error: "Session not found." });
+    return response.json({
+      id: session.id,
+      studentName: session.studentName,
+      status: session.status,
+      startedAt: session.startedAt,
+      submittedAt: session.submittedAt,
+      finalCode: session.finalCode,
+      assignment: { id: session.assignment.id, title: session.assignment.title, statementMd: session.assignment.statementMd, language: session.assignment.language },
+      events: session.events.map((event) => ({ id: event.id, type: event.type, timestamp: event.timestamp, payload: JSON.parse(event.payloadJson) as unknown })),
+      assessment: session.assessment
+        ? {
+            summary: JSON.parse(session.assessment.summaryJson) as unknown,
+            report: JSON.parse(session.assessment.reportJson) as unknown,
+            authorshipScore: session.assessment.authorshipScore,
+            engagementScore: session.assessment.engagementScore
+          }
+        : null
+    });
   } catch (error) { return next(error); }
 });
 
@@ -55,6 +103,39 @@ app.post("/api/sessions/:id/run", async (request, response, next) => {
     const results = await runCode(language, code, tests);
     await prisma.event.create({ data: { sessionId: session.id, type: "TEST_RUN", timestamp: new Date(), payloadJson: JSON.stringify({ allPassed: results.every((result) => result.passed), failedTest: results.find((result) => !result.passed)?.name, results }) } });
     return response.json({ results });
+  } catch (error) { return next(error); }
+});
+
+app.post("/api/sessions/:id/submit", async (request, response, next) => {
+  try {
+    const { code, language } = request.body as { code?: unknown; language?: unknown };
+    if (typeof code !== "string" || (language !== "python" && language !== "cpp")) return response.status(400).json({ error: "code and a supported language are required." });
+    const session = await prisma.session.findUnique({ where: { id: request.params.id }, include: { assignment: true } });
+    if (!session) return response.status(404).json({ error: "Session not found." });
+    if (session.status !== "IN_PROGRESS") return response.status(409).json({ error: "Session has already been submitted." });
+
+    const hiddenTests = JSON.parse(session.assignment.hiddenTestsJson) as TestCase[];
+    const hiddenResults = await runCode(language, code, hiddenTests);
+    const submittedAt = new Date();
+    await prisma.event.createMany({
+      data: [
+        { sessionId: session.id, type: "TEST_RUN", timestamp: submittedAt, payloadJson: JSON.stringify({ hidden: true, allPassed: hiddenResults.every((result) => result.passed), failedTest: hiddenResults.find((result) => !result.passed)?.name, results: hiddenResults }) },
+        { sessionId: session.id, type: "SUBMIT", timestamp: submittedAt, payloadJson: JSON.stringify({ hiddenPassed: hiddenResults.filter((result) => result.passed).length, hiddenTotal: hiddenResults.length }) }
+      ]
+    });
+    await prisma.session.update({ where: { id: session.id }, data: { finalCode: code, submittedAt, status: "SUBMITTED" } });
+
+    const events = await prisma.event.findMany({ where: { sessionId: session.id }, orderBy: { timestamp: "asc" } });
+    const { summary, report } = await assessSession({ statement: session.assignment.statementMd, finalCode: code, events, startedAt: session.startedAt });
+
+    const assessment = await prisma.assessment.upsert({
+      where: { sessionId: session.id },
+      create: { sessionId: session.id, summaryJson: JSON.stringify(summary), reportJson: JSON.stringify(report), authorshipScore: report.authorshipScore, engagementScore: report.engagementScore },
+      update: { summaryJson: JSON.stringify(summary), reportJson: JSON.stringify(report), authorshipScore: report.authorshipScore, engagementScore: report.engagementScore }
+    });
+    await prisma.session.update({ where: { id: session.id }, data: { status: "ASSESSED" } });
+
+    return response.json({ hiddenResults, summary, report, assessment: { id: assessment.id, authorshipScore: assessment.authorshipScore, engagementScore: assessment.engagementScore } });
   } catch (error) { return next(error); }
 });
 

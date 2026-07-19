@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const eventTypes = [
   "SESSION_START", "CODE_EDIT", "PROMPT_SENT", "AI_RESPONSE",
   "CODE_PASTED", "TEST_RUN", "SUBMIT", "IDLE_GAP"
@@ -43,3 +45,18 @@ export interface RunResult {
   passed: boolean;
   error?: string;
 }
+
+export const assessmentReportSchema = z.object({
+  processNarrative: z.string().min(1),
+  learningSignals: z.array(z.object({ signal: z.string().min(1), evidence: z.string().min(1) })),
+  concernSignals: z.array(z.object({ signal: z.string().min(1), evidence: z.string().min(1) })),
+  authorshipScore: z.number().int().min(0).max(100),
+  engagementScore: z.number().int().min(0).max(100),
+  vivaQuestions: z.array(z.object({
+    question: z.string().min(1),
+    anchor: z.string().min(1),
+    expectedUnderstanding: z.string().min(1)
+  })).length(4)
+});
+
+export type AssessmentReport = z.infer<typeof assessmentReportSchema>;
