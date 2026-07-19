@@ -1,0 +1,20 @@
+{
+  "name": "provenance",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "check": "npm run check --workspaces",
+    "db:generate": "prisma generate --schema apps/server/prisma/schema.prisma",
+    "db:push": "prisma db push --schema apps/server/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema apps/server/prisma/schema.prisma",
+    "seed": "npm run db:generate && npm run db:push && npm run seed --workspace @provenance/server",
+    "dev": "concurrently -n client,server -c cyan,green \"npm run dev --workspace @provenance/client\" \"npm run dev --workspace @provenance/server\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prisma": "^6.0.1",
+    "typescript": "^5.7.2"
+  }
+}

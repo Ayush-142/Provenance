@@ -1,0 +1,21 @@
+{
+  "name": "@provenance/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.1",
+    "@provenance/shared": "*",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "openai": "^4.77.0",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": { "@types/express": "^5.0.0", "@types/node": "^22.10.1" }
+}

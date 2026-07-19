@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Assignment {
+  id              String    @id @default(cuid())
+  title           String
+  statementMd     String
+  language        String
+  visibleTestsJson String
+  hiddenTestsJson  String
+  sessions        Session[]
+  createdAt       DateTime  @default(now())
+}
+
+model Session {
+  id           String      @id @default(cuid())
+  studentName  String
+  assignmentId String
+  startedAt    DateTime
+  submittedAt  DateTime?
+  finalCode    String?
+  status       SessionStatus @default(IN_PROGRESS)
+  assignment   Assignment  @relation(fields: [assignmentId], references: [id])
+  events       Event[]
+  assessment   Assessment?
+}
+
+model Event {
+  id        String    @id @default(cuid())
+  sessionId String
+  type      EventType
+  timestamp DateTime
+  payloadJson String
+  session   Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, timestamp])
+}
+
+model Assessment {
+  id              String   @id @default(cuid())
+  sessionId       String   @unique
+  summaryJson     String
+  reportJson      String
+  authorshipScore Int
+  engagementScore Int
+  createdAt       DateTime @default(now())
+  session         Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  SUBMITTED
+  ASSESSED
+}
+
+enum EventType {
+  SESSION_START
+  CODE_EDIT
+  PROMPT_SENT
+  AI_RESPONSE
+  CODE_PASTED
+  TEST_RUN
+  SUBMIT
+  IDLE_GAP
+}
