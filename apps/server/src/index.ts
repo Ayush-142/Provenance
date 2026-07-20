@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import { eventTypes, type EventType, type TestCase } from "@provenance/shared";
+import { eventTypes, type EventType, type SessionDetailResponse, type SessionListItem, type TestCase } from "@provenance/shared";
 import { prisma } from "./db.js";
 import { runCode } from "./runner.js";
 import { summarizeSession } from "./session-summary.js";
@@ -36,16 +36,17 @@ app.get("/api/sessions", async (_request, response, next) => {
       orderBy: { startedAt: "desc" },
       include: { assignment: { select: { title: true } }, assessment: { select: { authorshipScore: true, engagementScore: true } } }
     });
-    return response.json(sessions.map((session) => ({
+    const items: SessionListItem[] = sessions.map((session) => ({
       id: session.id,
       studentName: session.studentName,
       assignmentTitle: session.assignment.title,
-      startedAt: session.startedAt,
-      submittedAt: session.submittedAt,
+      startedAt: session.startedAt.toISOString(),
+      submittedAt: session.submittedAt?.toISOString() ?? null,
       status: session.status,
       authorshipScore: session.assessment?.authorshipScore ?? null,
       engagementScore: session.assessment?.engagementScore ?? null
-    })));
+    }));
+    return response.json(items);
   } catch (error) { return next(error); }
 });
 
@@ -56,24 +57,25 @@ app.get("/api/sessions/:id", async (request, response, next) => {
       include: { assignment: true, events: { orderBy: { timestamp: "asc" } }, assessment: true }
     });
     if (!session) return response.status(404).json({ error: "Session not found." });
-    return response.json({
+    const body: SessionDetailResponse = {
       id: session.id,
       studentName: session.studentName,
       status: session.status,
-      startedAt: session.startedAt,
-      submittedAt: session.submittedAt,
+      startedAt: session.startedAt.toISOString(),
+      submittedAt: session.submittedAt?.toISOString() ?? null,
       finalCode: session.finalCode,
       assignment: { id: session.assignment.id, title: session.assignment.title, statementMd: session.assignment.statementMd, language: session.assignment.language },
-      events: session.events.map((event) => ({ id: event.id, type: event.type, timestamp: event.timestamp, payload: JSON.parse(event.payloadJson) as unknown })),
+      events: session.events.map((event) => ({ id: event.id, type: event.type, timestamp: event.timestamp.toISOString(), payload: JSON.parse(event.payloadJson) as Record<string, unknown> })),
       assessment: session.assessment
         ? {
-            summary: JSON.parse(session.assessment.summaryJson) as unknown,
-            report: JSON.parse(session.assessment.reportJson) as unknown,
+            summary: JSON.parse(session.assessment.summaryJson),
+            report: JSON.parse(session.assessment.reportJson),
             authorshipScore: session.assessment.authorshipScore,
             engagementScore: session.assessment.engagementScore
           }
         : null
-    });
+    };
+    return response.json(body);
   } catch (error) { return next(error); }
 });
 

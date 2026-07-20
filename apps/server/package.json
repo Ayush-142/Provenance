@@ -12,10 +12,11 @@
   "dependencies": {
     "@prisma/client": "^6.0.1",
     "@provenance/shared": "*",
+    "diff-match-patch": "^1.0.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "openai": "^4.77.0",
     "tsx": "^4.19.2"
   },
-  "devDependencies": { "@types/express": "^5.0.0", "@types/node": "^22.10.1" }
+  "devDependencies": { "@types/diff-match-patch": "^1.0.36", "@types/express": "^5.0.0", "@types/node": "^22.10.1" }
 }

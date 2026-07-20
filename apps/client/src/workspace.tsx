@@ -1,6 +1,7 @@
 import { Editor, type OnMount } from "@monaco-editor/react";
 import { diff_match_patch } from "diff-match-patch";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import type { AssessmentReport, EventType, RunResult, TestCase } from "@provenance/shared";
 
 type Assignment = { id: string; title: string; statementMd: string; language: "python" | "cpp"; visibleTests: TestCase[] };
@@ -173,7 +174,7 @@ export function Workspace(): JSX.Element {
 
   return <div className="flex h-screen flex-col overflow-hidden">
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
-      <div><span className="text-lg font-black tracking-tight">provenance</span><span className="ml-3 rounded-full bg-teal/10 px-2.5 py-1 text-xs font-bold text-teal">STUDENT WORKSPACE</span></div>
+      <div><span className="text-lg font-black tracking-tight">provenance</span><span className="ml-3 rounded-full bg-teal/10 px-2.5 py-1 text-xs font-bold text-teal">STUDENT WORKSPACE</span><Link to="/instructor" className="ml-3 text-xs font-semibold text-slate-400 underline-offset-2 hover:text-teal hover:underline">Instructor dashboard →</Link></div>
       <div className="flex items-center gap-5 text-sm">
         {submitError && <span className="text-xs font-semibold text-rose-600">{submitError}</span>}
         <button onClick={() => void submitAssignment()} disabled={isSubmitting || submission !== null || !sessionId} className="rounded-lg bg-ink px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
