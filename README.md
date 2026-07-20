@@ -6,6 +6,17 @@ Students solve assignments in a browser IDE with an AI tutor built in. Every act
 
 See [plan.md](plan.md) for the full product spec.
 
+## AI tooling: Codex & GPT-5.6
+
+**Codex** was used throughout the build itself — scaffolding the initial client/server/shared workspace structure, writing portions of the Express routes, Prisma schema, and React components, and doing debugging/code review passes (catching issues like the event-batching flush logic and the client-side Vite proxy config) before commits went in.
+
+**GPT-5.6** isn't just a build-time tool here — it's a live dependency of the running product, powering both of Provenance's agents:
+
+- **Tutor Agent** (`POST /api/sessions/:id/chat`) — a streamed, Socratic CS tutor that helps students debug and reason through the assignment.
+- **Assessor Agent** (`POST /api/sessions/:id/assess`) — analyzes a submitted session's full event timeline and returns the structured process report (narrative, authorship/engagement scores, viva questions), validated against a Zod schema.
+
+See [ai-provider.ts](apps/server/src/ai-provider.ts) for the model call layer — it auto-detects an OpenAI vs. Gemini key by shape so the same code path can run against either provider.
+
 ## Tech stack
 
 - **Frontend**: React + Vite + TypeScript, Monaco Editor, Tailwind CSS
