@@ -1,11 +1,6 @@
-import OpenAI from "openai";
 import { assessmentReportSchema, type AssessmentReport, type SessionSummary } from "@provenance/shared";
 import { summarizeSession, type StoredEvent } from "./session-summary.js";
-
-function client(): OpenAI {
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured.");
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-}
+import { generateText } from "./ai-provider.js";
 
 function payload(event: StoredEvent): Record<string, unknown> {
   try {
@@ -88,8 +83,7 @@ function parseReport(raw: string): { success: true; data: AssessmentReport } | {
 }
 
 async function requestReport(instructions: string, userContent: string): Promise<string> {
-  const response = await client().responses.create({ model: "gpt-5.6", instructions, input: userContent });
-  return response.output_text;
+  return generateText({ model: "gpt-5.6", instructions, input: userContent, jsonMode: true });
 }
 
 export async function assessSession(input: { statement: string; finalCode: string; events: StoredEvent[]; startedAt: Date }): Promise<{ summary: SessionSummary; report: AssessmentReport }> {
